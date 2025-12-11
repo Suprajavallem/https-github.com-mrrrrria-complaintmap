@@ -30,7 +30,6 @@ from modules import (
 # GLOBAL STYLES
 # --------------------------------------------------------------------
 
-
 def apply_global_style():
     """Apply global CSS styles for the layout, colors and banner."""
     st.markdown(
@@ -109,7 +108,6 @@ def render_banner():
 # MAIN REPORT PAGE (MAP + COMPLAINT FORM)
 # --------------------------------------------------------------------
 
-
 def render_report_home():
     """Main home page: interactive map on the left and reporting form on the right."""
     st.subheader("🗺️ Report an issue on the map")
@@ -129,9 +127,9 @@ def render_report_home():
     if not df_all.empty:
         cluster = MarkerCluster().add_to(m)
         for _, row in df_all.iterrows():
-            color = COLOR_MAP.get(row["type"], "#5c7cfa")
+            color = COLOR_MAP.get(row["issue_type"], "#5c7cfa")
             popup_text = (
-                f"{row['type']} (Intensity {row['intensite']})"
+                f"{row['issue_type']} (Intensity {row['intensity']})"
                 f"<br>{row['description'] or ''}"
             )
             folium.CircleMarker(
@@ -179,24 +177,23 @@ def render_report_home():
                 f"`lon = {clicked['lon']:.5f}`"
             )
 
-            issue_types = {
-                "Air quality": "Air",
-                "Noise": "Bruit",
-                "Heat": "Chaleur",
-                "Cycling / Walking": "Vélo / Piéton",
-                "Odor": "Odeur",
-                "Other": "Autre",
-            }
+            ISSUE_TYPES = [
+                "Air quality",
+                "Noise",
+                "Heat",
+                "Cycling / Walking",
+                "Odor",
+                "Other",
+            ]
 
             col1, col2 = st.columns(2)
 
             with col1:
-                issue_label = st.selectbox(
-                    "Issue type",
-                    list(issue_types.keys()),
-                    key="issue_type_home",
-                )
-                issue_type = issue_types[issue_label]
+                issue_type = st.selectbox(
+                "Issue type",
+                ISSUE_TYPES,
+                key="issue_type_home",
+            )
 
                 intensity = st.slider(
                     "Perceived intensity (1 = low, 5 = high)",
@@ -265,7 +262,6 @@ def render_report_home():
 # MAIN APP
 # --------------------------------------------------------------------
 
-
 def main():
     setup()
     init_db()
@@ -314,4 +310,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 # streamlit run /Users/maria/Desktop/complaintmap/app.py
