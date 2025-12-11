@@ -19,21 +19,21 @@ def render(df_all):
     with colf1:
         type_filter = st.multiselect(
             "Issue types",
-            options=sorted(df_all["type"].unique()),
-            default=list(sorted(df_all["type"].unique())),
+            options=sorted(df_all["issue_type"].unique()),
+            default=list(sorted(df_all["issue_type"].unique())),
         )
     with colf2:
         intensite_min = st.slider("Minimum intensity", 1, 5, 1)
     with colf3:
         date_min = st.date_input(
             "From date",
-            value=df_all["date_heure"].min().date() if not df_all.empty else None,
+            value=df_all["timestamp"].min().date() if not df_all.empty else None,
         )
 
     df = df_all[
-        (df_all["type"].isin(type_filter))
-        & (df_all["intensite"] >= intensite_min)
-        & (df_all["date_heure"].dt.date >= date_min)
+        (df_all["issue_type"].isin(type_filter))
+        & (df_all["intensity"] >= intensite_min)
+        & (df_all["timestamp"].dt.date >= date_min)
     ]
 
     if df.empty:
@@ -45,9 +45,9 @@ def render(df_all):
 
     for _, row in df.iterrows():
         popup_lines = [
-            f"<b>Type:</b> {row['type']}",
-            f"<b>Intensity:</b> {row['intensite']} / 5",
-            f"<b>Date:</b> {row['date_heure']}",
+            f"<b>Type:</b> {row['issue_type']}",
+            f"<b>Intensity:</b> {row['intensity']} / 5",
+            f"<b>Date:</b> {row['timestamp']}",
         ]
         if row["description"]:
             popup_lines.append(f"<b>Description:</b> {row['description']}")
@@ -58,7 +58,7 @@ def render(df_all):
         folium.CircleMarker(
             location=[row["lat"], row["lon"]],
             radius=6,
-            color=COLOR_MAP.get(row["type"], "black"),
+            color=COLOR_MAP.get(row["issue_type"], "black"),
             fill=True,
             fill_opacity=0.8,
             popup=popup_html,
@@ -68,7 +68,7 @@ def render(df_all):
     use_heatmap = st.checkbox("Also display heatmap (density of issues)")
     if use_heatmap:
         heat_data = [
-            [row["lat"], row["lon"], row["intensite"]] for _, row in df.iterrows()
+            [row["lat"], row["lon"], row["intensity"]] for _, row in df.iterrows()
         ]
         HeatMap(heat_data, radius=15, blur=10).add_to(base_map)
 
