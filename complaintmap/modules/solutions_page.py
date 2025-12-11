@@ -1,5 +1,16 @@
 import streamlit as st
 
+# Mapping from internal issue types (stored in DB) to nice display labels
+TYPE_LABELS = {
+    "Air quality": "Air quality",
+    "Noise": "Noise",
+    "Heat": "Urban heat / heat stress",
+    "Cycling / Walking": "Cycling / walking",
+    "Odor": "Odor nuisance",
+    "Other": "Other issues",
+}
+
+
 def classify_solution(row):
     """
     Return a simple proposed technical solution based on the issue type.
@@ -7,40 +18,40 @@ def classify_solution(row):
     Parameters
     ----------
     row : pandas.Series
-        One complaint row, with at least a 'type' column.
+        One complaint row, with at least an 'issue_type' column.
 
     Returns
     -------
     str
         A short English description of a possible solution.
     """
-    issue_type = row["type"]
+    issue_type = row["issue_type"]
 
-    if issue_type == "Air":
+    if issue_type == "Air quality":
         return (
             "Reduce motorized traffic, create continuous cycling corridors "
             "and add trees or green buffers along the street."
         )
 
-    if issue_type == "Bruit":
+    if issue_type == "Noise":
         return (
             "Introduce a 30 km/h zone, use noise-reducing pavement and, where needed, "
             "install acoustic barriers or green walls."
         )
 
-    if issue_type == "Chaleur":
+    if issue_type == "Heat":
         return (
             "Increase vegetation (trees, shrubs), add shading structures or solar canopies, "
             "and use light-colored, reflective materials."
         )
 
-    if issue_type == "Vélo / Piéton":
+    if issue_type == "Cycling / Walking":
         return (
             "Build protected cycling lanes, secure pedestrian crossings and improve "
             "street lighting and visibility."
         )
 
-    if issue_type == "Odeur":
+    if issue_type == "Odor":
         return (
             "Identify the odor source (waste, industry, traffic) and improve emission control, "
             "storage conditions and local ventilation."
@@ -49,18 +60,6 @@ def classify_solution(row):
     return (
         "A more detailed analysis is required to define the most appropriate interventions."
     )
-
-
-
-# Mapping from internal French types to nicer English labels for display
-TYPE_LABELS = {
-    "Air": "Air quality",
-    "Bruit": "Noise",
-    "Chaleur": "Heat",
-    "Vélo / Piéton": "Cycling / Walking",
-    "Odeur": "Odor",
-    "Autre": "Other",
-}
 
 
 def render(df_all):
@@ -75,10 +74,12 @@ def render(df_all):
     df_sol["proposed_solution"] = df_sol.apply(classify_solution, axis=1)
 
     # Add a nice display label for type
-    df_sol["issue_type_label"] = df_sol["type"].map(TYPE_LABELS).fillna(df_sol["type"])
+    df_sol["issue_type_label"] = df_sol["issue_type"].map(TYPE_LABELS).fillna(
+        df_sol["issue_type"]
+    )
 
     # ----------------- FILTERS ----------------- #
-    st.subheader("🎛️ Filters")
+    st.subheader("Filters")
 
     col_f1, col_f2, col_f3 = st.columns(3)
 
@@ -106,12 +107,12 @@ def render(df_all):
     # Apply filters
     df_filtered = df_sol[
         df_sol["issue_type_label"].isin(selected_types)
-        & (df_sol["intensite"] >= min_intensity)
-        & (df_sol["intensite"] <= max_intensity)
+        & (df_sol["intensity"] >= min_intensity)
+        & (df_sol["intensity"] <= max_intensity)
     ]
 
     if high_priority_only:
-        df_filtered = df_filtered[df_filtered["intensite"] >= 4]
+        df_filtered = df_filtered[df_filtered["intensity"] >= 4]
 
     if df_filtered.empty:
         st.warning("No reports match the selected filters.")
@@ -128,14 +129,14 @@ def render(df_all):
 
         # Prepare a nicer display dataframe
         df_display = df_filtered[
-            ["date_heure", "issue_type_label", "intensite", "description", "proposed_solution"]
+            ["timestamp", "issue_type_label", "intensity", "description", "proposed_solution"]
         ].copy()
 
         df_display.rename(
             columns={
-                "date_heure": "Date & time",
+                "timestamp": "Date & time",
                 "issue_type_label": "Issue type",
-                "intensite": "Intensity (1–5)",
+                "intensity": "Intensity (1–5)",
                 "description": "Description",
                 "proposed_solution": "Proposed solution",
             },
@@ -165,10 +166,10 @@ def render(df_all):
         st.subheader("Summary by issue type")
 
         summary = (
-            df_filtered.groupby(["type", "issue_type_label"])
+            df_filtered.groupby(["issue_type", "issue_type_label"])
             .agg(
                 reports=("id", "count"),
-                avg_intensity=("intensite", "mean"),
+                avg_intensity=("intensity", "mean"),
             )
             .reset_index()
         )
@@ -205,14 +206,14 @@ def render(df_all):
         )
 
         # Determine which types are present in the filtered data
-        types_present = sorted(df_filtered["type"].unique())
+        types_present = sorted(df_filtered["issue_type"].unique())
 
         # For each type present, show a recommendation block
         for t in types_present:
             label = TYPE_LABELS.get(t, t)
             st.markdown(f"### {label}")
 
-            if t == "Air":
+            if t == "Air quality":
                 st.markdown(
                     """
                     **Main objectives:** reduce local emissions and exposure to pollutants.
@@ -230,7 +231,7 @@ def render(df_all):
                     """
                 )
 
-            elif t == "Bruit":
+            elif t == "Noise":
                 st.markdown(
                     """
                     **Main objectives:** reduce noise peaks and chronic exposure.
@@ -248,7 +249,7 @@ def render(df_all):
                     """
                 )
 
-            elif t == "Chaleur":
+            elif t == "Heat":
                 st.markdown(
                     """
                     **Main objectives:** reduce urban heat islands and increase shade.
@@ -266,7 +267,7 @@ def render(df_all):
                     """
                 )
 
-            elif t == "Vélo / Piéton":
+            elif t == "Cycling / Walking":
                 st.markdown(
                     """
                     **Main objectives:** improve safety and comfort for walking and cycling.
@@ -284,7 +285,7 @@ def render(df_all):
                     """
                 )
 
-            elif t == "Odeur":
+            elif t == "Odor":
                 st.markdown(
                     """
                     **Main objectives:** identify sources and reduce nuisance odours.
@@ -301,7 +302,7 @@ def render(df_all):
                     """
                 )
 
-            else:  # "Autre" or anything else
+            else:  # "Other" or anything else
                 st.markdown(
                     """
                     **Main objectives:** investigate the specific nature of the issue.
