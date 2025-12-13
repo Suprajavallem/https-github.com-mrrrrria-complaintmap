@@ -274,12 +274,12 @@ def main():
 
     pages = {
         "🏠 Report": "home",
-        "🗺️ Map & Heatmap": "map",
-        "📊 Statistics": "stats",
-        "💡 Proposed solutions": "solutions",
-        "🌫️ Air heatmap": "air",
-        "☀️ Solar canopy": "solar",
-        "ℹ️ About": "about",
+        "Map & Heatmap": "map",
+        "Statistics": "stats",
+        "Proposed solutions": "solutions",
+        "Air heatmap": "air",
+        "Solar canopy": "solar",
+        "About": "about",
     }
 
     choice = st.sidebar.radio("Go to", list(pages.keys()))
