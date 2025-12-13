@@ -22,7 +22,7 @@ from modules import (
     statistics_page,
     solutions_page,
     air_heatmap_page,
-    solar_canopy,
+    solar_tool,
     about_page,
 )
 
@@ -278,7 +278,7 @@ def main():
         "Statistics": "stats",
         "Proposed solutions": "solutions",
         "Air heatmap": "air",
-        "Solar canopy": "solar",
+        "Solar tool": "solar",
         "About": "about",
     }
 
