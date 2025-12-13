@@ -75,7 +75,7 @@ def render():
     st.subheader("1) Location (Lyon, France)")
     
     # --- ADDRESS SEARCH ---
-    q = st.text_input("Search address (Please enter your location, results focused on Lyon, France.)", "")
+    q = st.text_input("Search address (Please enter your location:)", "")
     if q:
         res = nominatim(q)
         for r in res:
