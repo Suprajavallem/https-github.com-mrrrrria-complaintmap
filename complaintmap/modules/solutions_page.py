@@ -63,7 +63,7 @@ def classify_solution(row):
 
 
 def render(df_all):
-    st.header("💡 Technical Solutions Based on Reported Issues")
+    st.header("Technical Solutions Based on Reported Issues")
 
     if df_all.empty:
         st.info("Add some reports first to see suggested solutions.")
@@ -120,7 +120,7 @@ def render(df_all):
 
     # ----------------- TABS LAYOUT ----------------- #
     tab_overview, tab_by_type, tab_reco = st.tabs(
-        ["🔍 Overview", "📊 By issue type", "🛠️ Recommendations"]
+        ["Overview", "By issue type", "Recommendations"]
     )
 
     # ========== TAB 1: OVERVIEW ========== #
