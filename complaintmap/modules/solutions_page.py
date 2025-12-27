@@ -1,317 +1,227 @@
 import streamlit as st
+import folium
+from folium.plugins import HeatMap
+from streamlit_folium import st_folium
+import pandas as pd
+import numpy as np
 
-# Mapping from internal issue types (stored in DB) to nice display labels
-TYPE_LABELS = {
-    "Air quality": "Air quality",
-    "Noise": "Noise",
-    "Heat": "Urban heat / heat stress",
-    "Cycling / Walking": "Cycling / walking",
-    "Odor": "Odor nuisance",
-    "Other": "Other issues",
-}
+# UI STYLING
 
-
-def classify_solution(row):
+st.markdown(
     """
-    Return a simple proposed technical solution based on the issue type.
+    <style>
+        div[data-baseweb="select"] > div {
+            width: 520px !important;
+        }
+        .solution-card {
+            background-color: #ffffff;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0px 2px 8px rgba(0,0,0,0.1);
+        }
+        .solution-header {
+            background-color: #f2f2f2;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+# NORMALIZE ISSUE NAMES
+def normalize_issue(raw_type):
+    if not isinstance(raw_type, str):
+        return "Other"
 
-    Parameters
-    ----------
-    row : pandas.Series
-        One complaint row, with at least an 'issue_type' column.
+    t = raw_type.strip().lower()
+    if t == "air":
+        return "Air"
+    if t == "chaleur":
+        return "Heat"
+    if t == "bruit":
+        return "Noise"
+    if t == "odeur":
+        return "Odour"
 
-    Returns
-    -------
-    str
-        A short English description of a possible solution.
-    """
-    issue_type = row["issue_type"]
+    return raw_type.capitalize()
 
-    if issue_type == "Air quality":
-        return (
-            "Reduce motorized traffic, create continuous cycling corridors "
-            "and add trees or green buffers along the street."
+# DESCRIPTIVE + VARIED SOLUTION LOGIC
+
+def get_solution(issue, intensity, variant_index):
+    intensity = int(intensity)
+
+    if issue == "Air":
+        solutions = (
+            [
+                "Conduct regular air quality monitoring in the locality and share pollution data with residents to encourage cleaner practices.",
+                "Install temporary air quality sensors near roads and public areas to identify minor pollution sources.",
+                "Organize public awareness programs to promote reduced vehicle usage and eco-friendly transportation."
+            ]
+            if intensity <= 3
+            else [
+                "Implement electric-vehicle-only zones in high-traffic areas to reduce emissions from conventional vehicles.",
+                "Restrict the movement of high-emission vehicles during peak hours and enforce stricter pollution norms.",
+                "Develop urban green buffer zones using trees and vegetation to absorb pollutants and improve air quality.",
+                "Install permanent air quality monitoring stations for continuous pollution tracking and policy planning."
+            ]
         )
 
-    if issue_type == "Noise":
-        return (
-            "Introduce a 30 km/h zone, use noise-reducing pavement and, where needed, "
-            "install acoustic barriers or green walls."
+    elif issue == "Heat":
+        solutions = (
+            [
+                "Increase tree plantation along streets and public spaces to provide natural shade and cooling.",
+                "Add shaded walkways, bus stops, and resting areas to protect pedestrians from direct heat exposure.",
+                "Promote community awareness programs on heat safety and preventive measures during hot weather."
+            ]
+            if intensity <= 3
+            else [
+                "Apply cool roof technology on buildings to reflect sunlight and reduce indoor temperatures.",
+                "Use heat-reflective materials on roads and pavements to minimize heat absorption.",
+                "Redesign open urban spaces with greenery and water features to reduce the overall heat island effect."
+            ]
         )
 
-    if issue_type == "Heat":
-        return (
-            "Increase vegetation (trees, shrubs), add shading structures or solar canopies, "
-            "and use light-colored, reflective materials."
+    elif issue == "Noise":
+        solutions = (
+            [
+                "Issue noise regulation notices and ensure compliance with permissible sound limits.",
+                "Conduct periodic noise level monitoring in residential and commercial zones.",
+                "Run public awareness campaigns to educate citizens about noise pollution and its impacts."
+            ]
+            if intensity <= 3
+            else [
+                "Install permanent noise barriers along roadsides and residential boundaries to reduce traffic noise.",
+                "Enforce strict speed limits and regulate heavy vehicle movement in sensitive areas.",
+                "Divert heavy traffic away from residential zones through alternate routes and traffic planning."
+            ]
         )
 
-    if issue_type == "Cycling / Walking":
-        return (
-            "Build protected cycling lanes, secure pedestrian crossings and improve "
-            "street lighting and visibility."
+    elif issue == "Odour":
+        solutions = (
+            [
+                "Inspect nearby waste disposal sites regularly to identify sources of unpleasant odours.",
+                "Increase sanitation monitoring and ensure timely waste collection in affected areas."
+            ]
+            if intensity <= 3
+            else [
+                "Implement strict waste management controls and enforce penalties for improper disposal.",
+                "Install odor neutralization and treatment systems near waste processing and sewage facilities."
+            ]
         )
 
-    if issue_type == "Odor":
-        return (
-            "Identify the odor source (waste, industry, traffic) and improve emission control, "
-            "storage conditions and local ventilation."
-        )
+    else:
+        solutions = ["Conduct routine monitoring and assessment of the reported issue."]
 
-    return (
-        "A more detailed analysis is required to define the most appropriate interventions."
-    )
+    return solutions[variant_index % len(solutions)]
 
 
-def render(df_all):
-    st.header("Technical Solutions Based on Reported Issues")
+# =========================================================
+# MAIN RENDER FUNCTION
+# =========================================================
+def render(df_all: pd.DataFrame):
+    st.title("🗺️ Smart Complaint Solution Map")
+    st.markdown(
+    "<h4 style='color: gray; margin-top: -10px;'>Proposed Solutions</h4>",
+    unsafe_allow_html=True
+)
 
-    if df_all.empty:
-        st.info("Add some reports first to see suggested solutions.")
+    if df_all is None or df_all.empty:
+        st.warning("No complaint data available.")
         return
 
-    # Copy data and compute proposed solution for each report
-    df_sol = df_all.copy()
-    df_sol["proposed_solution"] = df_sol.apply(classify_solution, axis=1)
+    df = df_all.copy()
+    df["issue"] = df["type"].apply(normalize_issue)
 
-    # Add a nice display label for type
-    df_sol["issue_type_label"] = df_sol["issue_type"].map(TYPE_LABELS).fillna(
-        df_sol["issue_type"]
-    )
+    issue_categories = ["All"] + sorted(df["issue"].unique().tolist())
+    selected_issue = st.selectbox("Reported Issue", issue_categories)
 
-    # ----------------- FILTERS ----------------- #
-    st.subheader("Filters")
+    if selected_issue != "All":
+        df = df[df["issue"] == selected_issue]
 
-    col_f1, col_f2, col_f3 = st.columns(3)
-
-    with col_f1:
-        type_options = sorted(df_sol["issue_type_label"].unique())
-        selected_types = st.multiselect(
-            "Issue types",
-            options=type_options,
-            default=type_options,
-        )
-
-    with col_f2:
-        min_intensity, max_intensity = st.slider(
-            "Intensity range",
-            min_value=1,
-            max_value=5,
-            value=(1, 5),
-        )
-
-    with col_f3:
-        high_priority_only = st.checkbox(
-            "Show only high-priority reports (intensity ≥ 4)"
-        )
-
-    # Apply filters
-    df_filtered = df_sol[
-        df_sol["issue_type_label"].isin(selected_types)
-        & (df_sol["intensity"] >= min_intensity)
-        & (df_sol["intensity"] <= max_intensity)
-    ]
-
-    if high_priority_only:
-        df_filtered = df_filtered[df_filtered["intensity"] >= 4]
-
-    if df_filtered.empty:
-        st.warning("No reports match the selected filters.")
+    if df.empty:
+        st.info("No complaints found for selected issue.")
         return
 
-    # ----------------- TABS LAYOUT ----------------- #
-    tab_overview, tab_by_type, tab_reco = st.tabs(
-        ["Overview", "By issue type", "Recommendations"]
+    required_cols = ["lat", "lon", "intensite", "date_heure"]
+    for col in required_cols:
+        if col not in df.columns:
+            st.error(f"Missing required column: {col}")
+            return
+
+    df_sorted = df.sort_values("date_heure")
+
+    grouped = (
+        df_sorted
+        .groupby(["lat", "lon", "issue"], as_index=False)
+        .last()
     )
 
-    # ========== TAB 1: OVERVIEW ========== #
-    with tab_overview:
-        st.subheader("Latest reports and proposed solutions")
+    grouped["intensity"] = grouped["intensite"].apply(
+        lambda x: int(x) if int(x) > 0 else 1
+    )
 
-        # Prepare a nicer display dataframe
-        df_display = df_filtered[
-            ["timestamp", "issue_type_label", "intensity", "description", "proposed_solution"]
-        ].copy()
+    latest_time = grouped["date_heure"].max()
+    latest_row = grouped.loc[grouped["date_heure"].idxmax()]
 
-        df_display.rename(
-            columns={
-                "timestamp": "Date & time",
-                "issue_type_label": "Issue type",
-                "intensity": "Intensity (1–5)",
-                "description": "Description",
-                "proposed_solution": "Proposed solution",
-            },
-            inplace=True,
-        )
+    # ---------------- MAP ----------------
+    m = folium.Map(
+        location=[latest_row["lat"], latest_row["lon"]],
+        zoom_start=14
+    )
 
-        # Show only the last N rows for readability
-        st.dataframe(df_display.tail(30), use_container_width=True)
+    HeatMap(
+        grouped[["lat", "lon"]].values.tolist(),
+        radius=25,
+        blur=18
+    ).add_to(m)
 
-        # Optional: small "card view" for the last few reports
-        st.markdown("#### Highlighted recent reports")
-        for _, row in df_display.tail(5).iterrows():
-            with st.container():
-                st.markdown(
-                    f"""
-                    **{row['Issue type']}** – intensity **{row['Intensity (1–5)']}**  
-                    _{row['Date & time']}_  
+    for idx, row in grouped.iterrows():
+        solution = get_solution(row["issue"], row["intensity"], idx)
+        color = "red" if row["date_heure"] == latest_time else "blue"
 
-                    - **Description:** {row['Description'] or '—'}
-                    - **Proposed solution:** {row['Proposed solution'] or '—'}
-                    """
-                )
-                st.markdown("---")
+        popup_html = f"""
+        <div style="width: 330px; font-family: Arial; border-radius: 12px; overflow: hidden;">
+            <div style="background:#f2f2f2; padding:12px;">
+                <b>Reported Issue :</b> {row['issue']}<br>
+                <b>Intensity :</b> {row['intensity']}
+            </div>
+            <div style="background:#fff; padding:14px;">
+                <b>Solution :</b><br>{solution}
+            </div>
+        </div>
+        """
 
-    # ========== TAB 2: BY ISSUE TYPE ========== #
-    with tab_by_type:
-        st.subheader("Summary by issue type")
+        folium.Marker(
+            location=[row["lat"], row["lon"]],
+            popup=popup_html,
+            icon=folium.Icon(color=color, icon="info-sign")
+        ).add_to(m)
 
-        summary = (
-            df_filtered.groupby(["issue_type", "issue_type_label"])
-            .agg(
-                reports=("id", "count"),
-                avg_intensity=("intensity", "mean"),
-            )
-            .reset_index()
-        )
+    st_folium(m, width=1400, height=650)
 
-        summary_display = summary[["issue_type_label", "reports", "avg_intensity"]].copy()
-        summary_display.rename(
-            columns={
-                "issue_type_label": "Issue type",
-                "reports": "Number of reports",
-                "avg_intensity": "Average intensity (1–5)",
-            },
-            inplace=True,
-        )
+    # ---------------- CURRENT SOLUTION BELOW MAP ----------------
+    st.subheader("📌 Current Reported Solution")
 
-        st.dataframe(summary_display, use_container_width=True)
+    current_solution = get_solution(
+        latest_row["issue"],
+        latest_row["intensity"],
+        0
+    )
 
-        st.markdown(
-            """
-            Higher average intensity and a large number of reports usually indicate
-            **priority areas for intervention**.
-            """
-        )
-
-    # ========== TAB 3: RECOMMENDATIONS ========== #
-    with tab_reco:
-        st.subheader("Targeted recommendations")
-
-        st.markdown(
-            """
-            Below are example interventions, tailored to the types of issues currently visible
-            with the selected filters. Use these as inspiration for urban planning, pilot projects
-            or communication campaigns.
-            """
-        )
-
-        # Determine which types are present in the filtered data
-        types_present = sorted(df_filtered["issue_type"].unique())
-
-        # For each type present, show a recommendation block
-        for t in types_present:
-            label = TYPE_LABELS.get(t, t)
-            st.markdown(f"### {label}")
-
-            if t == "Air quality":
-                st.markdown(
-                    """
-                    **Main objectives:** reduce local emissions and exposure to pollutants.
-
-                    **Possible measures:**
-                    - Low-emission or car-free zones at the most impacted streets.
-                    - Continuous cycling corridors to shift short trips away from cars.
-                    - Electrification of buses and delivery vehicles on key routes.
-                    - Installation of fixed and mobile air quality sensors.
-                    - Green buffers (trees, hedges) between traffic and sidewalks.
-
-                    **Quick wins:**
-                    - Pilot “school street” projects at peak hours.
-                    - Temporary traffic calming during high pollution episodes.
-                    """
-                )
-
-            elif t == "Noise":
-                st.markdown(
-                    """
-                    **Main objectives:** reduce noise peaks and chronic exposure.
-
-                    **Possible measures:**
-                    - 30 km/h zones on residential streets and near schools.
-                    - Noise-reducing road surfaces on noisy axes.
-                    - Acoustic barriers or green walls where space is limited.
-                    - Night-time delivery planning and quiet logistics.
-                    - Enforcing limits for motorcycles and modified exhausts.
-
-                    **Quick wins:**
-                    - Targeted controls on the streets most frequently reported.
-                    - Communication campaign about noise and health.
-                    """
-                )
-
-            elif t == "Heat":
-                st.markdown(
-                    """
-                    **Main objectives:** reduce urban heat islands and increase shade.
-
-                    **Possible measures:**
-                    - Planting trees and shrubs along sidewalks and squares.
-                    - Installing PV solar canopies above parking lots or open areas.
-                    - Light-colored or reflective roofs and façades.
-                    - Removing unnecessary asphalt and creating permeable surfaces.
-                    - Creating shaded resting spots with benches and water points.
-
-                    **Quick wins:**
-                    - Temporary shading (sails, pergolas) in hotspots.
-                    - “Cool routes” maps to guide pedestrians during heat waves.
-                    """
-                )
-
-            elif t == "Cycling / Walking":
-                st.markdown(
-                    """
-                    **Main objectives:** improve safety and comfort for walking and cycling.
-
-                    **Possible measures:**
-                    - Separated, continuous cycling lanes on main routes.
-                    - Safe pedestrian crossings with good visibility and signal timing.
-                    - Improved lighting along sidewalks and bikeways.
-                    - Reduced car speeds at conflict points.
-                    - Secure bike parking near public transport and services.
-
-                    **Quick wins:**
-                    - Tactical urbanism (temporary markings, bollards, paint).
-                    - Quick fixes on the most dangerous intersections reported.
-                    """
-                )
-
-            elif t == "Odor":
-                st.markdown(
-                    """
-                    **Main objectives:** identify sources and reduce nuisance odours.
-
-                    **Possible measures:**
-                    - Improved waste collection frequency and bin design.
-                    - Better management of restaurant and industrial exhausts.
-                    - Detection and repair of sewer or drainage issues.
-                    - Creation of ventilation corridors and air circulation paths.
-
-                    **Quick wins:**
-                    - Targeted inspections in hotspots repeatedly reported.
-                    - Communication with nearby businesses to adapt practices.
-                    """
-                )
-
-            else:  # "Other" or anything else
-                st.markdown(
-                    """
-                    **Main objectives:** investigate the specific nature of the issue.
-
-                    **Possible measures:**
-                    - Field visits to clarify the problem with residents.
-                    - Combining this map with other datasets (traffic, land use, etc.).
-                    - Small-scale pilots to test improvements.
-                    """
-                )
-
-            st.markdown("---")
+    st.markdown(
+        f"""
+        <div class="solution-card">
+            <div class="solution-header">
+                <b>Reported Issue :</b> {latest_row['issue']}<br>
+                <b>Intensity :</b> {latest_row['intensity']}
+            </div>
+            <div>
+                <b>Recommended Solution :</b><br><br>
+                {current_solution}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
