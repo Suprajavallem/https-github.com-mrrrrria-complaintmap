@@ -38,11 +38,11 @@ def normalize_issue(raw_type):
     t = raw_type.strip().lower()
     if t == "air":
         return "Air"
-    if t == "chaleur":
+    if t == "Heat":
         return "Heat"
-    if t == "bruit":
+    if t == "Noise":
         return "Noise"
-    if t == "odeur":
+    if t == "Odour":
         return "Odour"
 
     return raw_type.capitalize()
