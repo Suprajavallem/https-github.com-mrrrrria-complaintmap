@@ -5,10 +5,8 @@ from streamlit_folium import st_folium
 import pandas as pd
 import numpy as np
 
-
-# =========================================================
 # UI STYLING
-# =========================================================
+
 st.markdown(
     """
     <style>
@@ -32,11 +30,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
-
-# =========================================================
 # NORMALIZE ISSUE NAMES
-# =========================================================
 def normalize_issue(raw_type):
     if not isinstance(raw_type, str):
         return "Other"
@@ -53,10 +47,8 @@ def normalize_issue(raw_type):
 
     return raw_type.capitalize()
 
-
-# =========================================================
 # DESCRIPTIVE + VARIED SOLUTION LOGIC
-# =========================================================
+
 def get_solution(issue, intensity, variant_index):
     intensity = int(intensity)
 
@@ -130,6 +122,10 @@ def get_solution(issue, intensity, variant_index):
 # =========================================================
 def render(df_all: pd.DataFrame):
     st.title("🗺️ Smart Complaint Solution Map")
+    st.markdown(
+    "<h4 style='color: gray; margin-top: -10px;'>Proposed Solutions</h4>",
+    unsafe_allow_html=True
+)
 
     if df_all is None or df_all.empty:
         st.warning("No complaint data available.")
